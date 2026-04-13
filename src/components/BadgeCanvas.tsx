@@ -10,8 +10,9 @@ interface BadgeCanvasProps {
   onReady?: (dataUrl: string) => void;
 }
 
-const W = 600;
-const H = 820;
+// High resolution for quality
+const W = 1200;
+const H = 1640;
 
 function loadImg(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -23,82 +24,64 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number, startSize: number, font: string) {
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number, startSize: number, fontStyle: string) {
   let s = startSize;
-  ctx.font = `${s}px ${font}`;
-  while (ctx.measureText(text).width > maxW && s > 14) {
-    s -= 1;
-    ctx.font = `${s}px ${font}`;
+  ctx.font = `${s}px ${fontStyle}`;
+  while (ctx.measureText(text).width > maxW && s > 20) {
+    s -= 2;
+    ctx.font = `${s}px ${fontStyle}`;
   }
   return s;
 }
 
-function drawSparkles(ctx: CanvasRenderingContext2D, count: number, x: number, y: number, w: number, h: number) {
+// Draw gold gradient fill
+function createGoldGradient(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
+  const g = ctx.createLinearGradient(x1, y1, x2, y2);
+  g.addColorStop(0, "#8B6914");
+  g.addColorStop(0.15, "#C9A84C");
+  g.addColorStop(0.3, "#F5E6A3");
+  g.addColorStop(0.5, "#DFBE5C");
+  g.addColorStop(0.7, "#F5E6A3");
+  g.addColorStop(0.85, "#C9A84C");
+  g.addColorStop(1, "#8B6914");
+  return g;
+}
+
+function drawSparkles(ctx: CanvasRenderingContext2D, count: number, x: number, y: number, w: number, h: number, color = "rgba(255,255,240,") {
   for (let i = 0; i < count; i++) {
     const sx = x + Math.random() * w;
     const sy = y + Math.random() * h;
-    const size = Math.random() * 2.5 + 0.5;
-    const alpha = Math.random() * 0.8 + 0.2;
-    ctx.fillStyle = `rgba(255, 255, 220, ${alpha})`;
+    const size = Math.random() * 4 + 1;
+    const alpha = Math.random() * 0.9 + 0.1;
+
+    // Glow
+    const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, size * 3);
+    glow.addColorStop(0, `${color}${alpha})`);
+    glow.addColorStop(1, `${color}0)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(sx, sy, size * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core dot
+    ctx.fillStyle = `${color}${Math.min(1, alpha + 0.3)})`;
     ctx.beginPath();
     ctx.arc(sx, sy, size, 0, Math.PI * 2);
     ctx.fill();
-    // Cross sparkle for bigger ones
-    if (size > 1.8) {
-      ctx.strokeStyle = `rgba(255, 255, 220, ${alpha * 0.6})`;
-      ctx.lineWidth = 0.5;
+
+    // Star cross for bigger sparkles
+    if (size > 3) {
+      ctx.strokeStyle = `${color}${alpha * 0.7})`;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(sx - size * 2, sy);
-      ctx.lineTo(sx + size * 2, sy);
-      ctx.moveTo(sx, sy - size * 2);
-      ctx.lineTo(sx, sy + size * 2);
+      ctx.moveTo(sx - size * 4, sy);
+      ctx.lineTo(sx + size * 4, sy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - size * 4);
+      ctx.lineTo(sx, sy + size * 4);
       ctx.stroke();
     }
-  }
-}
-
-function drawGoldWave(ctx: CanvasRenderingContext2D, y: number, flip = false) {
-  const goldGrad = ctx.createLinearGradient(0, y - 15, 0, y + 15);
-  goldGrad.addColorStop(0, "#F0D78C");
-  goldGrad.addColorStop(0.3, "#C9A84C");
-  goldGrad.addColorStop(0.5, "#F5E6A3");
-  goldGrad.addColorStop(0.7, "#C9A84C");
-  goldGrad.addColorStop(1, "#8B6914");
-
-  ctx.fillStyle = goldGrad;
-  ctx.beginPath();
-  if (!flip) {
-    ctx.moveTo(0, y + 20);
-    ctx.quadraticCurveTo(W * 0.25, y - 25, W * 0.5, y);
-    ctx.quadraticCurveTo(W * 0.75, y + 25, W, y - 10);
-    ctx.lineTo(W, y + 20);
-    ctx.lineTo(0, y + 20);
-  } else {
-    ctx.moveTo(0, y - 10);
-    ctx.quadraticCurveTo(W * 0.3, y + 20, W * 0.5, y + 5);
-    ctx.quadraticCurveTo(W * 0.7, y - 15, W, y + 10);
-    ctx.lineTo(W, y - 10);
-    ctx.lineTo(0, y - 10);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawPinkRibbon(ctx: CanvasRenderingContext2D, y: number, h: number) {
-  // Multiple pink ribbon waves
-  for (let i = 0; i < 3; i++) {
-    const alpha = 0.3 + i * 0.15;
-    const offset = i * 8;
-    ctx.fillStyle = `rgba(233, 30, 99, ${alpha})`;
-    ctx.beginPath();
-    ctx.moveTo(0, y + offset + 10);
-    ctx.quadraticCurveTo(W * 0.2, y + offset - 15, W * 0.4, y + offset + 5);
-    ctx.quadraticCurveTo(W * 0.6, y + offset + 25, W * 0.8, y + offset);
-    ctx.quadraticCurveTo(W * 0.9, y + offset - 10, W, y + offset + 10);
-    ctx.lineTo(W, y + h);
-    ctx.lineTo(0, y + h);
-    ctx.closePath();
-    ctx.fill();
   }
 }
 
@@ -113,108 +96,145 @@ export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, 
       const ctx = canvas.getContext("2d")!;
       canvas.width = W;
       canvas.height = H;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
-      // === ROUNDED BADGE SHAPE (clip) ===
-      const r = 24;
+      // ========== ROUNDED CARD SHAPE ==========
+      const radius = 48;
       ctx.beginPath();
-      ctx.moveTo(r, 0);
-      ctx.lineTo(W - r, 0);
-      ctx.quadraticCurveTo(W, 0, W, r);
-      ctx.lineTo(W, H - r);
-      ctx.quadraticCurveTo(W, H, W - r, H);
-      ctx.lineTo(r, H);
-      ctx.quadraticCurveTo(0, H, 0, H - r);
-      ctx.lineTo(0, r);
-      ctx.quadraticCurveTo(0, 0, r, 0);
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(W - radius, 0);
+      ctx.quadraticCurveTo(W, 0, W, radius);
+      ctx.lineTo(W, H - radius);
+      ctx.quadraticCurveTo(W, H, W - radius, H);
+      ctx.lineTo(radius, H);
+      ctx.quadraticCurveTo(0, H, 0, H - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
       ctx.closePath();
+      ctx.save();
       ctx.clip();
 
-      // === PINK TOP SECTION ===
-      const pinkGrad = ctx.createLinearGradient(0, 0, W, 0);
-      pinkGrad.addColorStop(0, "#E8619A");
+      // ========== PINK TOP SECTION ==========
+      const pinkH = 310;
+      const pinkGrad = ctx.createLinearGradient(0, 0, W, pinkH);
+      pinkGrad.addColorStop(0, "#D63384");
+      pinkGrad.addColorStop(0.3, "#EC407A");
       pinkGrad.addColorStop(0.5, "#F48FB1");
-      pinkGrad.addColorStop(1, "#E8619A");
+      pinkGrad.addColorStop(0.7, "#EC407A");
+      pinkGrad.addColorStop(1, "#D63384");
       ctx.fillStyle = pinkGrad;
-      ctx.fillRect(0, 0, W, 160);
-      drawSparkles(ctx, 40, 0, 0, W, 160);
+      ctx.fillRect(0, 0, W, pinkH + 60);
+      drawSparkles(ctx, 80, 0, 0, W, pinkH, "rgba(255,255,255,");
 
-      // === BLACK SPARKLY CENTER ===
-      const blackGrad = ctx.createRadialGradient(W / 2, 400, 50, W / 2, 400, 450);
-      blackGrad.addColorStop(0, "#1a1a2e");
-      blackGrad.addColorStop(1, "#0a0a0a");
-      ctx.fillStyle = blackGrad;
-      ctx.fillRect(0, 140, W, 520);
-      drawSparkles(ctx, 120, 0, 140, W, 520);
+      // ========== BLACK CENTER AREA ==========
+      ctx.fillStyle = "#080808";
+      ctx.fillRect(0, pinkH - 20, W, H - pinkH - 200);
 
-      // === GOLD WAVE TOP (pink → black transition) ===
-      drawGoldWave(ctx, 145);
+      // Black texture - subtle radial lighter center
+      const blackRadial = ctx.createRadialGradient(W / 2, 700, 50, W / 2, 700, 600);
+      blackRadial.addColorStop(0, "rgba(30,20,30,0.6)");
+      blackRadial.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = blackRadial;
+      ctx.fillRect(0, pinkH - 20, W, H - pinkH - 200);
 
-      // === LANYARD HOLE ===
-      const holeW = 60, holeH = 12, holeX = (W - holeW) / 2, holeY = 18;
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      // Lots of sparkles on black area
+      drawSparkles(ctx, 200, 0, pinkH, W, H - pinkH - 250, "rgba(255,255,220,");
+      drawSparkles(ctx, 60, 0, pinkH, W, H - pinkH - 250, "rgba(255,200,100,");
+
+      // ========== GOLD WAVE TOP (pink → black) ==========
+      const waveY = pinkH;
+
+      // Gold band - elegant S-curve
+      ctx.save();
+      for (let pass = 0; pass < 3; pass++) {
+        const offset = pass * 4 - 4;
+        const goldG = createGoldGradient(ctx, 0, waveY - 30 + offset, 0, waveY + 30 + offset);
+        ctx.fillStyle = goldG;
+        ctx.beginPath();
+        ctx.moveTo(-10, waveY + 30 + offset);
+        ctx.bezierCurveTo(W * 0.15, waveY - 40 + offset, W * 0.35, waveY + 50 + offset, W * 0.5, waveY + offset);
+        ctx.bezierCurveTo(W * 0.65, waveY - 50 + offset, W * 0.85, waveY + 40 + offset, W + 10, waveY - 20 + offset);
+        ctx.lineTo(W + 10, waveY + 35 + offset);
+        ctx.bezierCurveTo(W * 0.85, waveY + 45 + offset, W * 0.65, waveY - 45 + offset, W * 0.5, waveY + 5 + offset);
+        ctx.bezierCurveTo(W * 0.35, waveY + 55 + offset, W * 0.15, waveY - 35 + offset, -10, waveY + 35 + offset);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Fill pink above wave properly
+      ctx.fillStyle = pinkGrad;
       ctx.beginPath();
-      ctx.ellipse(holeX + holeW / 2, holeY + holeH / 2, holeW / 2, holeH / 2, 0, 0, Math.PI * 2);
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(W + 10, 0);
+      ctx.lineTo(W + 10, waveY - 50);
+      ctx.bezierCurveTo(W * 0.85, waveY + 30, W * 0.65, waveY - 60, W * 0.5, waveY - 10);
+      ctx.bezierCurveTo(W * 0.35, waveY + 40, W * 0.15, waveY - 50, -10, waveY + 20);
+      ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "rgba(0,0,0,0.15)";
+      drawSparkles(ctx, 40, 0, 0, W, waveY, "rgba(255,255,255,");
+
+      // ========== LANYARD HOLE ==========
+      const holeW = 120, holeH = 24;
+      const holeCx = W / 2, holeCy = 40;
+      // White pill shape
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
       ctx.beginPath();
-      ctx.ellipse(holeX + holeW / 2, holeY + holeH / 2, holeW / 2 - 4, holeH / 2 - 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(holeCx, holeCy, holeW / 2, holeH / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Inner dark hole
+      ctx.fillStyle = "rgba(80,40,60,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(holeCx, holeCy, holeW / 2 - 8, holeH / 2 - 5, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // === LOGO ===
+      // ========== LOGO ==========
       try {
         const logo = await loadImg(apLogo);
-        const logoH = 90;
-        const logoW = 90;
-        ctx.drawImage(logo, (W - logoW) / 2, 42, logoW, logoH);
+        const logoSize = 180;
+        ctx.drawImage(logo, (W - logoSize) / 2, 70, logoSize, logoSize);
       } catch {}
 
-      // "COSMÉTICOS" text under logo
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "600 14px Montserrat, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("COSMÉTICOS", W / 2, 148);
+      // "COSMÉTICOS" under logo (since logo already has it, skip if logo includes text)
 
-      // === PHOTO with gold ring ===
-      const photoR = 115;
+      // ========== PHOTO WITH GOLD RING ==========
+      const photoR = 220;
       const photoCx = W / 2;
-      const photoCy = 320;
+      const photoCy = 620;
 
-      // Outer gold glow
-      const glowGrad = ctx.createRadialGradient(photoCx, photoCy, photoR - 10, photoCx, photoCy, photoR + 25);
-      glowGrad.addColorStop(0, "rgba(201,168,76,0.4)");
-      glowGrad.addColorStop(0.7, "rgba(201,168,76,0.15)");
-      glowGrad.addColorStop(1, "transparent");
-      ctx.fillStyle = glowGrad;
+      // Outer glow
+      const outerGlow = ctx.createRadialGradient(photoCx, photoCy, photoR, photoCx, photoCy, photoR + 60);
+      outerGlow.addColorStop(0, "rgba(201,168,76,0.5)");
+      outerGlow.addColorStop(0.5, "rgba(201,168,76,0.15)");
+      outerGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = outerGlow;
       ctx.beginPath();
-      ctx.arc(photoCx, photoCy, photoR + 25, 0, Math.PI * 2);
+      ctx.arc(photoCx, photoCy, photoR + 60, 0, Math.PI * 2);
       ctx.fill();
 
       // Thick gold ring
-      const ringGrad = ctx.createLinearGradient(photoCx - photoR, photoCy - photoR, photoCx + photoR, photoCy + photoR);
-      ringGrad.addColorStop(0, "#F5E6A3");
-      ringGrad.addColorStop(0.25, "#C9A84C");
-      ringGrad.addColorStop(0.5, "#F0D78C");
-      ringGrad.addColorStop(0.75, "#8B6914");
-      ringGrad.addColorStop(1, "#F5E6A3");
+      const ringW = 14;
+      const ringGrad = createGoldGradient(ctx, photoCx - photoR, photoCy - photoR, photoCx + photoR, photoCy + photoR);
       ctx.strokeStyle = ringGrad;
-      ctx.lineWidth = 8;
+      ctx.lineWidth = ringW;
       ctx.beginPath();
-      ctx.arc(photoCx, photoCy, photoR + 6, 0, Math.PI * 2);
+      ctx.arc(photoCx, photoCy, photoR + ringW / 2 + 2, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Inner thin gold ring
+      // Inner thin gold line
       ctx.strokeStyle = "#C9A84C";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(photoCx, photoCy, photoR - 2, 0, Math.PI * 2);
+      ctx.arc(photoCx, photoCy, photoR - 4, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Photo
+      // Photo clipped
       try {
         const photo = await loadImg(photoUrl);
         ctx.save();
         ctx.beginPath();
-        ctx.arc(photoCx, photoCy, photoR - 4, 0, Math.PI * 2);
+        ctx.arc(photoCx, photoCy, photoR - 6, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
         const aspect = photo.width / photo.height;
@@ -223,61 +243,155 @@ export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, 
         ctx.drawImage(photo, photoCx - dw / 2, photoCy - dh / 2, dw, dh);
         ctx.restore();
       } catch {
+        ctx.save();
         ctx.fillStyle = "#E91E63";
         ctx.beginPath();
-        ctx.arc(photoCx, photoCy, photoR - 4, 0, Math.PI * 2);
+        ctx.arc(photoCx, photoCy, photoR - 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ========== NAME (elegant cursive, gold) ==========
+      const nameY = photoCy + photoR + 100;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Shadow
+      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 4;
+
+      ctx.fillStyle = "#F0D78C";
+      const nameSize = fitText(ctx, name, W - 160, 88, "italic 'Georgia', 'Times New Roman', serif");
+      ctx.font = `italic ${nameSize}px 'Georgia', 'Times New Roman', serif`;
+      ctx.fillText(name, W / 2, nameY);
+
+      // Gold outline effect
+      ctx.strokeStyle = "rgba(139,105,20,0.4)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeText(name, W / 2, nameY);
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      // ========== PHONE ==========
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "500 36px 'Montserrat', sans-serif";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 6;
+      ctx.fillText(phone, W / 2, nameY + 65);
+      ctx.shadowBlur = 0;
+
+      // ========== REVENDEDORA TAG ==========
+      if (isRevendedora) {
+        const tagY = nameY + 120;
+        const tagText = "★  REVENDEDORA AP COSMÉTICOS  ★";
+        ctx.font = "700 24px 'Montserrat', sans-serif";
+        const tagW = ctx.measureText(tagText).width + 60;
+        const tagH = 44;
+
+        // Gold pill background
+        const pillX = (W - tagW) / 2;
+        const pillR = tagH / 2;
+        ctx.beginPath();
+        ctx.moveTo(pillX + pillR, tagY - tagH / 2);
+        ctx.lineTo(pillX + tagW - pillR, tagY - tagH / 2);
+        ctx.quadraticCurveTo(pillX + tagW, tagY - tagH / 2, pillX + tagW, tagY);
+        ctx.quadraticCurveTo(pillX + tagW, tagY + tagH / 2, pillX + tagW - pillR, tagY + tagH / 2);
+        ctx.lineTo(pillX + pillR, tagY + tagH / 2);
+        ctx.quadraticCurveTo(pillX, tagY + tagH / 2, pillX, tagY);
+        ctx.quadraticCurveTo(pillX, tagY - tagH / 2, pillX + pillR, tagY - tagH / 2);
+        ctx.closePath();
+        ctx.fillStyle = createGoldGradient(ctx, pillX, tagY - tagH / 2, pillX + tagW, tagY + tagH / 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#1a0a00";
+        ctx.font = "700 22px 'Montserrat', sans-serif";
+        ctx.fillText(tagText, W / 2, tagY + 2);
+      }
+
+      // ========== BOTTOM GOLD WAVE ==========
+      const bottomWaveY = H - 280;
+
+      // Gold band
+      for (let pass = 0; pass < 3; pass++) {
+        const offset = pass * 4 - 4;
+        const gG = createGoldGradient(ctx, 0, bottomWaveY - 20 + offset, 0, bottomWaveY + 20 + offset);
+        ctx.fillStyle = gG;
+        ctx.beginPath();
+        ctx.moveTo(-10, bottomWaveY + offset);
+        ctx.bezierCurveTo(W * 0.2, bottomWaveY - 40 + offset, W * 0.4, bottomWaveY + 30 + offset, W * 0.55, bottomWaveY - 10 + offset);
+        ctx.bezierCurveTo(W * 0.7, bottomWaveY - 50 + offset, W * 0.9, bottomWaveY + 20 + offset, W + 10, bottomWaveY - 30 + offset);
+        ctx.lineTo(W + 10, bottomWaveY + 10 + offset);
+        ctx.bezierCurveTo(W * 0.9, bottomWaveY + 30 + offset, W * 0.7, bottomWaveY - 40 + offset, W * 0.55, bottomWaveY + offset);
+        ctx.bezierCurveTo(W * 0.4, bottomWaveY + 40 + offset, W * 0.2, bottomWaveY - 30 + offset, -10, bottomWaveY + 10 + offset);
+        ctx.closePath();
         ctx.fill();
       }
 
-      // === NAME (cursive/script style) ===
-      const nameY = photoCy + photoR + 55;
-      ctx.fillStyle = "#F0D78C";
-      ctx.shadowColor = "rgba(0,0,0,0.6)";
-      ctx.shadowBlur = 6;
-      const nameDisplay = name;
-      const nameSize = fitText(ctx, nameDisplay, W - 80, 44, "italic 700 Montserrat, Georgia, serif");
-      ctx.font = `italic 700 ${nameSize}px Georgia, 'Times New Roman', serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(nameDisplay, W / 2, nameY);
-      ctx.shadowBlur = 0;
+      // ========== PINK BOTTOM SECTION ==========
+      const pinkBottomY = bottomWaveY + 5;
+      const pinkBotGrad = ctx.createLinearGradient(0, pinkBottomY, W, H);
+      pinkBotGrad.addColorStop(0, "#C2185B");
+      pinkBotGrad.addColorStop(0.3, "#E91E63");
+      pinkBotGrad.addColorStop(0.5, "#F06292");
+      pinkBotGrad.addColorStop(0.7, "#E91E63");
+      pinkBotGrad.addColorStop(1, "#C2185B");
+      ctx.fillStyle = pinkBotGrad;
+      ctx.fillRect(0, pinkBottomY, W, H - pinkBottomY);
 
-      // === PHONE ===
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "500 18px Montserrat, sans-serif";
-      ctx.fillText(phone, W / 2, nameY + 32);
-
-      // === REVENDEDORA TAG ===
-      if (isRevendedora) {
-        ctx.fillStyle = "#C9A84C";
-        ctx.font = "700 12px Montserrat, sans-serif";
-        ctx.fillText("★ REVENDEDORA AP COSMÉTICOS ★", W / 2, nameY + 58);
+      // Pink ribbon waves
+      for (let r = 0; r < 4; r++) {
+        const ry = pinkBottomY + r * 15 + 20;
+        const ribbonAlpha = 0.15 + r * 0.08;
+        ctx.fillStyle = `rgba(255, 150, 200, ${ribbonAlpha})`;
+        ctx.beginPath();
+        ctx.moveTo(-10, ry + 30);
+        ctx.bezierCurveTo(W * 0.2, ry - 20, W * 0.5, ry + 40, W * 0.7, ry);
+        ctx.bezierCurveTo(W * 0.85, ry - 30, W * 0.95, ry + 20, W + 10, ry + 10);
+        ctx.lineTo(W + 10, H + 10);
+        ctx.lineTo(-10, H + 10);
+        ctx.closePath();
+        ctx.fill();
       }
 
-      // === BOTTOM SECTION ===
-      const bottomY = H - 130;
+      drawSparkles(ctx, 80, 0, pinkBottomY, W, H - pinkBottomY, "rgba(255,255,255,");
+      drawSparkles(ctx, 30, 0, pinkBottomY, W, H - pinkBottomY, "rgba(255,220,180,");
 
-      // Gold wave bottom
-      drawGoldWave(ctx, bottomY, true);
-
-      // Pink ribbon area
-      ctx.fillStyle = "#E91E63";
-      ctx.fillRect(0, bottomY + 10, W, H - bottomY - 10);
-      drawPinkRibbon(ctx, bottomY + 5, H - bottomY);
-      drawSparkles(ctx, 50, 0, bottomY + 10, W, H - bottomY - 10);
-
-      // "Revendedoras de Sucesso AP" text
-      ctx.fillStyle = "#FFFFFF";
-      ctx.shadowColor = "rgba(0,0,0,0.4)";
-      ctx.shadowBlur = 4;
-      ctx.font = "italic 700 28px Georgia, 'Times New Roman', serif";
+      // ========== "Revendedoras de Sucesso AP" ==========
       ctx.textAlign = "center";
-      ctx.fillText("Revendedoras de Sucesso AP", W / 2, H - 55);
-      ctx.shadowBlur = 0;
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
 
-      // Participant number small
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "500 11px Montserrat, sans-serif";
-      ctx.fillText(`Nº ${String(participantNumber).padStart(3, "0")}`, W / 2, H - 25);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "italic 700 56px 'Georgia', 'Times New Roman', serif";
+      ctx.fillText("Revendedoras de Sucesso AP", W / 2, H - 160);
+
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Participant number
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "500 22px 'Montserrat', sans-serif";
+      ctx.fillText(`Nº ${String(participantNumber).padStart(3, "0")}`, W / 2, H - 80);
+
+      // ========== CARD BORDER (subtle) ==========
+      ctx.restore();
+      ctx.strokeStyle = "rgba(201,168,76,0.3)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(W - radius, 0);
+      ctx.quadraticCurveTo(W, 0, W, radius);
+      ctx.lineTo(W, H - radius);
+      ctx.quadraticCurveTo(W, H, W - radius, H);
+      ctx.lineTo(radius, H);
+      ctx.quadraticCurveTo(0, H, 0, H - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
+      ctx.closePath();
+      ctx.stroke();
 
       setLoading(false);
       const dataUrl = canvas.toDataURL("image/png");
@@ -291,12 +405,15 @@ export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, 
     <div className="relative">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg">
-          <p className="text-muted-foreground animate-pulse">Gerando seu crachá…</p>
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-pink-300 border-t-pink-600 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-muted-foreground text-sm">Gerando seu crachá…</p>
+          </div>
         </div>
       )}
       <canvas
         ref={canvasRef}
-        className="w-full max-w-[300px] mx-auto rounded-xl shadow-2xl"
+        className="w-full max-w-[320px] mx-auto rounded-xl shadow-2xl"
         style={{ aspectRatio: `${W}/${H}` }}
       />
     </div>
