@@ -7,21 +7,12 @@ interface BadgeCanvasProps {
   phone: string;
   photoUrl: string;
   participantNumber: number;
+  isRevendedora: boolean;
   onReady?: (dataUrl: string) => void;
 }
 
-const BADGE_W = 600;
-const BADGE_H = 900;
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, fontSize: number, fontWeight: string) {
-  let size = fontSize;
-  ctx.font = `${fontWeight} ${size}px Montserrat, sans-serif`;
-  while (ctx.measureText(text).width > maxWidth && size > 16) {
-    size -= 1;
-    ctx.font = `${fontWeight} ${size}px Montserrat, sans-serif`;
-  }
-  return size;
-}
+const W = 600;
+const H = 960;
 
 function loadImg(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -33,7 +24,31 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   });
 }
 
-export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, onReady }: BadgeCanvasProps) {
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number, startSize: number, weight = "700", family = "Montserrat, sans-serif") {
+  let s = startSize;
+  ctx.font = `${weight} ${s}px ${family}`;
+  while (ctx.measureText(text).width > maxW && s > 14) {
+    s -= 1;
+    ctx.font = `${weight} ${s}px ${family}`;
+  }
+  return s;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, isRevendedora, onReady }: BadgeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,130 +57,194 @@ export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, 
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d")!;
-      canvas.width = BADGE_W;
-      canvas.height = BADGE_H;
+      canvas.width = W;
+      canvas.height = H;
 
-      // Background
+      // === BACKGROUND ===
       try {
         const bg = await loadImg(badgeBg);
-        ctx.drawImage(bg, 0, 0, BADGE_W, BADGE_H);
+        ctx.drawImage(bg, 0, 0, W, H);
       } catch {
-        // fallback gradient
-        const grad = ctx.createLinearGradient(0, 0, 0, BADGE_H);
-        grad.addColorStop(0, "#E91E63");
-        grad.addColorStop(0.6, "#880E4F");
-        grad.addColorStop(1, "#1a1a1a");
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, "#0a0a0a");
+        grad.addColorStop(0.4, "#1a0a14");
+        grad.addColorStop(1, "#880E4F");
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, BADGE_W, BADGE_H);
+        ctx.fillRect(0, 0, W, H);
       }
 
-      // Dark overlay for readability
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.fillRect(0, 0, BADGE_W, BADGE_H);
+      // Subtle dark overlay
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(0, 0, W, H);
 
-      // Gold top border
-      ctx.fillStyle = "#C9A84C";
-      ctx.fillRect(0, 0, BADGE_W, 6);
+      // === TOP GOLD ACCENT LINE ===
+      const goldGrad = ctx.createLinearGradient(0, 0, W, 0);
+      goldGrad.addColorStop(0, "transparent");
+      goldGrad.addColorStop(0.2, "#C9A84C");
+      goldGrad.addColorStop(0.5, "#F0D78C");
+      goldGrad.addColorStop(0.8, "#C9A84C");
+      goldGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = goldGrad;
+      ctx.fillRect(0, 0, W, 4);
 
-      // Logo
+      // === LOGO ===
       try {
         const logo = await loadImg(apLogo);
-        const logoH = 80;
-        const logoW = 80;
-        ctx.drawImage(logo, (BADGE_W - logoW) / 2, 30, logoW, logoH);
+        ctx.drawImage(logo, (W - 70) / 2, 28, 70, 70);
       } catch {}
 
-      // "AP COSMÉTICOS" text
+      // "AP COSMÉTICOS" brand
       ctx.fillStyle = "#C9A84C";
-      ctx.font = "600 18px Montserrat, sans-serif";
+      ctx.font = "700 16px Montserrat, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("AP COSMÉTICOS", BADGE_W / 2, 130);
+      ctx.letterSpacing = "4px";
+      ctx.fillText("A P   C O S M É T I C O S", W / 2, 120);
 
-      // Participant photo - circular
-      const photoSize = 200;
-      const photoX = (BADGE_W - photoSize) / 2;
-      const photoY = 160;
+      // Thin gold divider
+      ctx.strokeStyle = "#C9A84C55";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(160, 138);
+      ctx.lineTo(W - 160, 138);
+      ctx.stroke();
 
+      // === PHOTO ===
+      const photoSize = 210;
+      const photoCx = W / 2;
+      const photoCy = 270;
+
+      // Outer glow ring
+      const glowGrad = ctx.createRadialGradient(photoCx, photoCy, photoSize / 2 - 5, photoCx, photoCy, photoSize / 2 + 20);
+      glowGrad.addColorStop(0, "rgba(201,168,76,0.3)");
+      glowGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(photoCx, photoCy, photoSize / 2 + 20, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gold border ring
+      ctx.strokeStyle = "#C9A84C";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(photoCx, photoCy, photoSize / 2 + 5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Photo clipped circle
       try {
         const photo = await loadImg(photoUrl);
         ctx.save();
         ctx.beginPath();
-        ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+        ctx.arc(photoCx, photoCy, photoSize / 2, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        // Cover the circle
         const aspect = photo.width / photo.height;
-        let sw = photoSize, sh = photoSize;
-        if (aspect > 1) { sw = photoSize * aspect; } else { sh = photoSize / aspect; }
-        ctx.drawImage(photo, photoX + (photoSize - sw) / 2, photoY + (photoSize - sh) / 2, sw, sh);
+        let dw = photoSize, dh = photoSize;
+        if (aspect > 1) dw = photoSize * aspect; else dh = photoSize / aspect;
+        ctx.drawImage(photo, photoCx - dw / 2, photoCy - dh / 2, dw, dh);
         ctx.restore();
       } catch {
         ctx.fillStyle = "#E91E63";
         ctx.beginPath();
-        ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+        ctx.arc(photoCx, photoCy, photoSize / 2, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Gold ring around photo
-      ctx.strokeStyle = "#C9A84C";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 4, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Participant number
+      // === PARTICIPANT NUMBER BADGE ===
+      const numY = photoCy + photoSize / 2 + 20;
+      const numText = `Nº ${String(participantNumber).padStart(3, "0")}`;
+      const numW = 90;
+      const numH = 28;
+      roundRect(ctx, (W - numW) / 2, numY - numH / 2, numW, numH, 14);
       ctx.fillStyle = "#C9A84C";
-      ctx.font = "600 14px Montserrat, sans-serif";
+      ctx.fill();
+      ctx.fillStyle = "#0a0a0a";
+      ctx.font = "700 13px Montserrat, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`Nº ${String(participantNumber).padStart(3, "0")}`, BADGE_W / 2, photoY + photoSize + 40);
+      ctx.fillText(numText, W / 2, numY + 5);
 
-      // Name
+      // === NAME ===
+      const nameY = numY + 50;
       ctx.fillStyle = "#FFFFFF";
-      const nameSize = wrapText(ctx, name.toUpperCase(), BADGE_W - 80, 36, "700");
+      const nameUpper = name.toUpperCase();
+      const nameSize = fitText(ctx, nameUpper, W - 80, 38);
       ctx.font = `700 ${nameSize}px Montserrat, sans-serif`;
       ctx.textAlign = "center";
-      ctx.fillText(name.toUpperCase(), BADGE_W / 2, photoY + photoSize + 80);
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 8;
+      ctx.fillText(nameUpper, W / 2, nameY);
+      ctx.shadowBlur = 0;
 
-      // Divider
-      ctx.strokeStyle = "#C9A84C";
-      ctx.lineWidth = 2;
+      // === ROLE TAG ===
+      const roleY = nameY + 35;
+      const roleText = isRevendedora ? "✨ REVENDEDORA AP COSMÉTICOS ✨" : "PARTICIPANTE";
+      const roleW = ctx.measureText(roleText).width + 40;
+      
+      if (isRevendedora) {
+        // Pink pill for revendedora
+        roundRect(ctx, (W - roleW) / 2, roleY - 16, roleW, 30, 15);
+        ctx.fillStyle = "#E91E63";
+        ctx.fill();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "700 13px Montserrat, sans-serif";
+        ctx.fillText(roleText, W / 2, roleY + 4);
+      } else {
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = "500 13px Montserrat, sans-serif";
+        ctx.fillText(roleText, W / 2, roleY + 4);
+      }
+
+      // === PHONE ===
+      const phoneY = roleY + 45;
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "500 16px Montserrat, sans-serif";
+      ctx.fillText("📞 " + phone, W / 2, phoneY);
+
+      // === GOLD DIVIDER ===
+      const divY = phoneY + 30;
+      const divGrad = ctx.createLinearGradient(100, 0, W - 100, 0);
+      divGrad.addColorStop(0, "transparent");
+      divGrad.addColorStop(0.3, "#C9A84C");
+      divGrad.addColorStop(0.7, "#C9A84C");
+      divGrad.addColorStop(1, "transparent");
+      ctx.strokeStyle = divGrad;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(180, photoY + photoSize + 100);
-      ctx.lineTo(BADGE_W - 180, photoY + photoSize + 100);
+      ctx.moveTo(100, divY);
+      ctx.lineTo(W - 100, divY);
       ctx.stroke();
 
-      // Phone
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = "500 18px Montserrat, sans-serif";
-      ctx.fillText(phone, BADGE_W / 2, photoY + photoSize + 130);
-
-      // Event name
+      // === EVENT NAME ===
+      const eventY = divY + 40;
       ctx.fillStyle = "#E91E63";
-      ctx.font = "700 20px Montserrat, sans-serif";
-      ctx.fillText("REVENDEDORAS DE SUCESSO", BADGE_W / 2, BADGE_H - 120);
-
-      // Sparkle line
+      ctx.font = "800 22px Montserrat, sans-serif";
+      ctx.fillText("REVENDEDORAS", W / 2, eventY);
       ctx.fillStyle = "#C9A84C";
-      ctx.font = "600 14px Montserrat, sans-serif";
-      ctx.fillText("✨ Evento Exclusivo ✨", BADGE_W / 2, BADGE_H - 90);
+      ctx.font = "700 18px Montserrat, sans-serif";
+      ctx.fillText("DE SUCESSO", W / 2, eventY + 28);
 
-      // Gold bottom border
-      ctx.fillStyle = "#C9A84C";
-      ctx.fillRect(0, BADGE_H - 6, BADGE_W, 6);
+      // === BOTTOM SECTION ===
+      // Share message
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.font = "400 11px Montserrat, sans-serif";
+      ctx.fillText("Compartilhe nos stories e marque @apcosmesticos", W / 2, H - 50);
 
-      // Bottom text
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "400 12px Montserrat, sans-serif";
-      ctx.fillText("Compartilhe nos stories e marque a AP Cosméticos", BADGE_W / 2, BADGE_H - 30);
+      // Bottom gold line
+      const bottomGrad = ctx.createLinearGradient(0, 0, W, 0);
+      bottomGrad.addColorStop(0, "transparent");
+      bottomGrad.addColorStop(0.2, "#C9A84C");
+      bottomGrad.addColorStop(0.5, "#F0D78C");
+      bottomGrad.addColorStop(0.8, "#C9A84C");
+      bottomGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = bottomGrad;
+      ctx.fillRect(0, H - 4, W, 4);
 
       setLoading(false);
-
       const dataUrl = canvas.toDataURL("image/png");
       onReady?.(dataUrl);
     };
 
     draw();
-  }, [name, phone, photoUrl, participantNumber, onReady]);
+  }, [name, phone, photoUrl, participantNumber, isRevendedora, onReady]);
 
   return (
     <div className="relative">
@@ -176,8 +255,8 @@ export default function BadgeCanvas({ name, phone, photoUrl, participantNumber, 
       )}
       <canvas
         ref={canvasRef}
-        className="w-full max-w-[300px] mx-auto rounded-lg shadow-2xl"
-        style={{ aspectRatio: "2/3" }}
+        className="w-full max-w-[300px] mx-auto rounded-xl shadow-2xl"
+        style={{ aspectRatio: `${W}/${H}` }}
       />
     </div>
   );
