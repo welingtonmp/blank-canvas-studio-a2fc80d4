@@ -3,6 +3,7 @@ export interface Participant {
   name: string;
   phone: string;
   photoUrl: string;
+  isRevendedora: boolean;
   badgeUrl?: string;
   createdAt: string;
   number: number;
